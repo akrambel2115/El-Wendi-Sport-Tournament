@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -55,6 +55,13 @@ export function MatchScheduling() {
     status: "scheduled" as const,
   });
 
+  // Get all referee IDs when component mounts
+  const allRefereeIds = useMemo(() => {
+    return staff
+      .filter(s => s.role === "referee")
+      .map(referee => referee._id);
+  }, [staff]);
+
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [showAddMatchForm, setShowAddMatchForm] = useState(false);
   const [showEditMatchForm, setShowEditMatchForm] = useState(false);
@@ -71,8 +78,18 @@ export function MatchScheduling() {
     type: "goal",
     playerId: "",
     teamId: "" as unknown as Id<"teams">,
-    minute: 0,
+    minute: 1,
   });
+
+  // Handler to open the add match form
+  const handleOpenAddMatchForm = () => {
+    // Pre-select all referees by default
+    setNewMatch({
+      ...newMatch,
+      referees: [...allRefereeIds]
+    });
+    setShowAddMatchForm(true);
+  };
 
   const handleCreateMatch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +111,7 @@ export function MatchScheduling() {
         status: "scheduled",
       });
       
+      // Reset form but keep referees selected
       setNewMatch({
         date: "",
         time: "",
@@ -101,7 +119,7 @@ export function MatchScheduling() {
         teamBId: "",
         stage: "group",
         groupId: "",
-        referees: [],
+        referees: [...allRefereeIds], // Keep all referees selected
         status: "scheduled",
       });
       
@@ -110,7 +128,7 @@ export function MatchScheduling() {
   };
 
   const handleAddEvent = () => {
-    if (newEvent.playerId && newEvent.minute > 0 && newEvent.teamId) {
+    if (newEvent.playerId && newEvent.teamId) {
       setMatchResult({
         ...matchResult,
         events: [...matchResult.events, { ...newEvent }],
@@ -120,7 +138,7 @@ export function MatchScheduling() {
         type: "goal",
         playerId: "",
         teamId: "" as unknown as Id<"teams">,
-        minute: 0,
+        minute: 1,
       });
     }
   };
@@ -183,15 +201,13 @@ export function MatchScheduling() {
     return member ? member.name : "غير معروف";
   };
 
-  // Format dates in Arabic
+  // Format dates in French style (DD-MM-YYYY)
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return new Date(dateString).toLocaleDateString("ar-SA", options);
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   return (
@@ -205,7 +221,7 @@ export function MatchScheduling() {
       {/* Add Match Button */}
       <div className="flex justify-end">
         <button
-          onClick={() => setShowAddMatchForm(true)}
+          onClick={handleOpenAddMatchForm}
           className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
         >
           إضافة مباراة جديدة
@@ -513,22 +529,6 @@ export function MatchScheduling() {
                       <option value="redCard">طرد</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">الدقيقة</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={newEvent.minute}
-                      onChange={(e) =>
-                        setNewEvent({
-                          ...newEvent,
-                          minute: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full p-2 text-sm border rounded-md"
-                    />
-                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
@@ -552,7 +552,7 @@ export function MatchScheduling() {
                       </option>
                     </select>
                   </div>
-    <div>
+                  <div>
                     <label className="block text-xs font-medium mb-1">اللاعب</label>
                     <input
                       type="text"

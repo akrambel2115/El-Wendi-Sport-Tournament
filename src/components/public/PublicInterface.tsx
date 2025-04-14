@@ -50,15 +50,13 @@ export function PublicInterface() {
     return team ? team.name : "فريق غير معروف";
   };
 
-  // Format dates in Arabic
+  // Format dates in French style (DD-MM-YYYY)
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return new Date(dateString).toLocaleDateString("ar-SA", options);
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   // Get upcoming matches (limit to 5)
@@ -1385,7 +1383,6 @@ export function PublicInterface() {
                 <div className="my-8 bg-amber-50 p-6 rounded-lg">
                   <h4 className="text-lg font-semibold mb-3">معلومات عن البطولة</h4>
                   <ul className="space-y-2">
-                    <li><span className="font-medium">المنظم:</span> نادي الوندي سبور</li>
                     <li><span className="font-medium">عدد الفرق المشاركة:</span> {teams.length} فريق</li>
                     <li><span className="font-medium">عدد المجموعات:</span> {tournamentGroups.length} مجموعات</li>
                     <li><span className="font-medium">إجمالي عدد المباريات:</span> {matches.length} مباراة</li>
@@ -1401,7 +1398,7 @@ export function PublicInterface() {
                       </li>
                     )}
                   </ul>
-        </div>
+                </div>
 
                 <h4 className="text-lg font-bold mb-3">الهدف من البطولة</h4>
                 <p className="mb-4">
@@ -1415,10 +1412,44 @@ export function PublicInterface() {
                 </ul>
                 
                 <h4 className="text-lg font-bold mb-3">اللجنة المنظمة</h4>
-                <p className="italic">
-                  تم تنظيم هذه البطولة بواسطة نادي الوندي سبور بفضل جهود اللجنة المنظمة والمتطوعين الذين عملوا بجد لجعل هذا الحدث ممكناً.
-            </p>
-          </div>
+                <p className="italic mb-4">
+                  تم تنظيم هذه البطولة بفضل ابن الأستاذ المرحوم بشاشحية أحسن السيد بشاشحية معتز و جهود اللجنة المنظمة والمتطوعين الذين عملوا بجد لجعل هذا الحدث ممكناً.
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                  <div className="bg-blue-50 rounded-lg p-4 shadow text-center transition-transform hover:scale-105">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-blue-600 text-xl font-bold">ب.م</span>
+                    </div>
+                    <h5 className="font-bold text-blue-800">بشاشحية معتز</h5>
+                    <p className="text-blue-600 text-sm">منظم</p>
+                  </div>
+                  
+                  <div className="bg-green-50 rounded-lg p-4 shadow text-center transition-transform hover:scale-105">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-green-600 text-xl font-bold">ب.أ</span>
+                    </div>
+                    <h5 className="font-bold text-green-800">بلبخوش أحمد عبد الرؤوف</h5>
+                    <p className="text-green-600 text-sm">منظم</p>
+                  </div>
+                  
+                  <div className="bg-amber-50 rounded-lg p-4 shadow text-center transition-transform hover:scale-105">
+                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-amber-600 text-xl font-bold">ب.م</span>
+                    </div>
+                    <h5 className="font-bold text-amber-800">بلبخوش محمد أشرف</h5>
+                    <p className="text-amber-600 text-sm">منظم</p>
+                  </div>
+                  
+                  <div className="bg-purple-50 rounded-lg p-4 shadow text-center transition-transform hover:scale-105">
+                    <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-purple-600 text-xl font-bold">س.ب</span>
+                    </div>
+                    <h5 className="font-bold text-purple-800">سعداوي بلقاسم</h5>
+                    <p className="text-purple-600 text-sm">منظم</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

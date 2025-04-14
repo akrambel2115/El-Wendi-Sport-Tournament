@@ -5,7 +5,6 @@ import { Id } from "../../../convex/_generated/dataModel";
 
 interface Player {
   fullName: string;
-  dateOfBirth: string;
   feeStatus: boolean;
   photoUrl?: string;
   paymentDate?: string;
@@ -29,7 +28,6 @@ interface Team {
 function isValidPlayer(player: any): player is Player {
   return (
     typeof player.fullName === 'string' &&
-    typeof player.dateOfBirth === 'string' &&
     typeof player.feeStatus === 'boolean'
   );
 }
@@ -49,7 +47,6 @@ export function TeamManagement() {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [newPlayer, setNewPlayer] = useState<Player>({
     fullName: "",
-    dateOfBirth: "",
     feeStatus: false,
     photoUrl: "",
   });
@@ -85,7 +82,7 @@ export function TeamManagement() {
   };
 
   const handleAddPlayer = (teamId: Id<"teams">) => {
-    if (newPlayer.fullName && newPlayer.dateOfBirth) {
+    if (newPlayer.fullName) {
       const team = teams.find((t) => t._id === teamId);
       if (team && team.players.length < 10) {
         const playerWithPaymentDate = newPlayer as Player;
@@ -97,7 +94,6 @@ export function TeamManagement() {
         
         setNewPlayer({
           fullName: "",
-          dateOfBirth: "",
           feeStatus: false,
           photoUrl: "",
         });
@@ -335,7 +331,6 @@ export function TeamManagement() {
                           />
                         </th>
                         <th className="px-6 py-2 text-right text-xs font-medium text-gray-500">اللاعب</th>
-                        <th className="px-6 py-2 text-right text-xs font-medium text-gray-500">تاريخ الميلاد</th>
                         <th className="px-6 py-2 text-right text-xs font-medium text-gray-500">حالة الدفع</th>
                         <th className="px-6 py-2 text-right text-xs font-medium text-gray-500">تاريخ الدفع</th>
                         <th className="px-6 py-2 text-right text-xs font-medium text-gray-500">الإجراءات</th>
@@ -353,9 +348,6 @@ export function TeamManagement() {
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
                             <p className="font-medium">{player.fullName}</p>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
-                            {player.dateOfBirth}
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
                             <button
@@ -437,19 +429,6 @@ export function TeamManagement() {
                   className="w-full p-2 border rounded-md"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  تاريخ الميلاد
-                </label>
-                <input
-                  type="date"
-                  value={newPlayer.dateOfBirth}
-                  onChange={(e) =>
-                    setNewPlayer({ ...newPlayer, dateOfBirth: e.target.value })
-                  }
-                  className="w-full p-2 border rounded-md"
-                />
-              </div>
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -504,22 +483,6 @@ export function TeamManagement() {
                     setEditingPlayer({
                       ...editingPlayer,
                       player: { ...editingPlayer.player, fullName: e.target.value }
-                    })
-                  }
-                  className="w-full p-2 border rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  تاريخ الميلاد
-                </label>
-                <input
-                  type="date"
-                  value={editingPlayer.player.dateOfBirth}
-                  onChange={(e) =>
-                    setEditingPlayer({
-                      ...editingPlayer,
-                      player: { ...editingPlayer.player, dateOfBirth: e.target.value }
                     })
                   }
                   className="w-full p-2 border rounded-md"

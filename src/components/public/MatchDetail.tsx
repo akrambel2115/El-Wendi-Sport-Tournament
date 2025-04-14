@@ -48,15 +48,13 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
     return team ? team.name : "فريق غير معروف";
   };
 
-  // Format dates in Arabic
+  // Format dates in French style (DD-MM-YYYY)
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return new Date(dateString).toLocaleDateString("ar-SA", options);
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   // Sort events by minute

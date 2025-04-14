@@ -16,7 +16,6 @@ const applicationTables = {
     players: v.array(
       v.object({
         fullName: v.string(),
-        dateOfBirth: v.string(),
         feeStatus: v.boolean(),
         photoUrl: v.optional(v.string()),
         paymentDate: v.optional(v.string()),
