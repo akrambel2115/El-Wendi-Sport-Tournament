@@ -1,6 +1,6 @@
 # El Wendi Sport Tournament Management System
 
-A full-featured web application for managing sports tournaments, dedicated to the memory of Bechachiya Ahsan, under the slogan "No to Drugs".
+A full-featured web application for managing sports tournaments, dedicated to the memory of Bechachhia Ahsan, under the slogan "No to Drugs".
 
 ## Overview
 
