@@ -45,6 +45,8 @@ export function TeamManagement() {
 
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+  const [editingTeamName, setEditingTeamName] = useState("");
   const [newPlayer, setNewPlayer] = useState<Player>({
     fullName: "",
     feeStatus: false,
@@ -240,6 +242,24 @@ export function TeamManagement() {
     return selectedPlayers[teamIdStr]?.length || 0;
   };
 
+  const handleEditTeam = (team: Team) => {
+    setEditingTeam(team);
+    setEditingTeamName(team.name);
+    setShowEditTeamModal(true);
+  };
+
+  const handleSaveTeamName = async () => {
+    if (editingTeam && editingTeamName.trim()) {
+      await updateTeam({
+        teamId: editingTeam._id,
+        name: editingTeamName,
+      });
+      
+      setShowEditTeamModal(false);
+      setEditingTeam(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleCreateTeam} className="space-y-4">
@@ -268,7 +288,7 @@ export function TeamManagement() {
               <h3 className="text-xl font-semibold">{team.name}</h3>
               <div className="space-x-2">
                 <button
-                  onClick={() => setEditingTeam(team)}
+                  onClick={() => handleEditTeam(team)}
                   className="bg-yellow-500 text-white px-3 py-1 rounded-md hover:bg-yellow-600"
                 >
                   تعديل
@@ -534,6 +554,41 @@ export function TeamManagement() {
                 </button>
                 <button
                   onClick={() => setEditingPlayer(null)}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditTeamModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md">
+            <h3 className="text-xl font-semibold mb-4">تعديل اسم الفريق</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  اسم الفريق
+                </label>
+                <input
+                  type="text"
+                  value={editingTeamName}
+                  onChange={(e) => setEditingTeamName(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={handleSaveTeamName}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                >
+                  حفظ
+                </button>
+                <button
+                  onClick={() => setShowEditTeamModal(false)}
                   className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
                 >
                   إلغاء

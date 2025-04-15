@@ -160,10 +160,34 @@ export function MatchScheduling() {
         return;
       }
       
+      // Parse scores safely with default to current values
+      const teamAGoals = data.teamAScore !== undefined && data.teamAScore !== '' 
+        ? parseInt(data.teamAScore) 
+        : matchResult.score.teamA;
+
+      const teamBGoals = data.teamBScore !== undefined && data.teamBScore !== '' 
+        ? parseInt(data.teamBScore) 
+        : matchResult.score.teamB;
+
+      // Check if the scores are valid numbers
+      if (isNaN(teamAGoals) || isNaN(teamBGoals)) {
+        console.error("Invalid score values", { teamAGoals, teamBGoals });
+        alert("قيم النتيجة غير صالحة. يرجى إدخال أرقام صحيحة فقط");
+        return;
+      }
+
+      console.log("Sending match result data:", {
+        matchId: editingMatch._id,
+        teamAGoals,
+        teamBGoals,
+        events: matchResult.events,
+        manOfTheMatch: matchResult.manOfTheMatch
+      });
+      
       const result = await recordMatchResult({
         matchId: editingMatch._id,
-        teamAGoals: parseInt(data.teamAScore || matchResult.score.teamA),
-        teamBGoals: parseInt(data.teamBScore || matchResult.score.teamB),
+        teamAGoals,
+        teamBGoals,
         events: matchResult.events,
         manOfTheMatch: matchResult.manOfTheMatch
       });
@@ -171,6 +195,11 @@ export function MatchScheduling() {
       console.log("Match result updated:", result);
       setShowResultForm(false);
       setEditingMatch(null);
+      setMatchResult({
+        score: { teamA: 0, teamB: 0 },
+        events: [],
+        manOfTheMatch: ""
+      });
       alert("تم تسجيل نتيجة المباراة بنجاح");
     } catch (error) {
       console.error("Error updating match result:", error);
