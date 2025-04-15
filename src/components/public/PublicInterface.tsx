@@ -25,6 +25,9 @@ export function PublicInterface() {
   useEffect(() => {
     if (teams && tournamentGroups) {
       handleSyncGroups(false);
+      
+      // Also sync team stats when page loads
+      handleSyncTeamStats();
     }
   }, [teams, tournamentGroups]);
 
@@ -656,26 +659,53 @@ export function PublicInterface() {
                   <div>
                     {/* Calculate top scorers */}
                     {(() => {
-                      // Collect all goals from match events
-                      const playerGoals: { [key: string]: { name: string; goals: number; teamName: string } } = {};
+                      // Group matches by player and team to avoid counting duplicate events
+                      const playerMatchGoals: { [key: string]: Set<string> } = {}; // key: playerId-teamId, value: Set of matchIds
+                      
+                      // Collect all goals from match events with deduplication
+                      const playerGoals: { [key: string]: { name: string; goals: number; teamName: string; matchIds: Set<string> } } = {};
                       
                       matches.forEach(match => {
                         if (match.status === "completed" && match.events) {
-                          match.events.forEach(event => {
-                            if (event.type === "goal") {
-                              const playerId = event.playerId;
-                              const team = teams.find(t => t._id === event.teamId);
-                              
-                              if (!playerGoals[playerId]) {
-                                playerGoals[playerId] = {
-                                  name: playerId,
-                                  goals: 0,
-                                  teamName: team?.name || "غير معروف"
-                                };
-                              }
-                              
-                              playerGoals[playerId].goals += 1;
+                          const goalEvents = match.events.filter(event => event.type === "goal");
+                          
+                          // Group goal events by player-team in this match
+                          const matchPlayerGoals: { [key: string]: { playerId: string, teamId: string, count: number } } = {};
+                          
+                          goalEvents.forEach(event => {
+                            // Normalize player name by converting to lowercase
+                            const normalizedName = event.playerId.toLowerCase().trim();
+                            const key = `${normalizedName}-${event.teamId}`;
+                            
+                            if (!matchPlayerGoals[key]) {
+                              matchPlayerGoals[key] = { 
+                                playerId: event.playerId, 
+                                teamId: event.teamId, 
+                                count: 0 
+                              };
                             }
+                            matchPlayerGoals[key].count++;
+                          });
+                          
+                          // Add goals to global counter
+                          Object.entries(matchPlayerGoals).forEach(([key, data]) => {
+                            const { playerId, teamId, count } = data;
+                            const team = teams.find(t => t._id === teamId);
+                            
+                            // Use normalized name as key
+                            const normalizedName = playerId.toLowerCase().trim();
+                            
+                            if (!playerGoals[normalizedName]) {
+                              playerGoals[normalizedName] = {
+                                name: playerId, // Keep original case for display
+                                goals: 0,
+                                teamName: team?.name || "غير معروف",
+                                matchIds: new Set()
+                              };
+                            }
+                            
+                            playerGoals[normalizedName].goals += count;
+                            playerGoals[normalizedName].matchIds.add(match._id);
                           });
                         }
                       });
@@ -1220,26 +1250,53 @@ export function PublicInterface() {
               </div>
               <div className="p-6">
                 {(() => {
-                  // Collect all goals from match events
-                  const playerGoals: { [key: string]: { name: string; goals: number; teamName: string } } = {};
+                  // Group matches by player and team to avoid counting duplicate events
+                  const playerMatchGoals: { [key: string]: Set<string> } = {}; // key: playerId-teamId, value: Set of matchIds
+                  
+                  // Collect all goals from match events with deduplication
+                  const playerGoals: { [key: string]: { name: string; goals: number; teamName: string; matchIds: Set<string> } } = {};
                   
                   matches.forEach(match => {
                     if (match.status === "completed" && match.events) {
-                      match.events.forEach(event => {
-                        if (event.type === "goal") {
-                          const playerId = event.playerId;
-                          const team = teams.find(t => t._id === event.teamId);
+                      const goalEvents = match.events.filter(event => event.type === "goal");
                           
-                          if (!playerGoals[playerId]) {
-                            playerGoals[playerId] = {
-                              name: playerId,
-                              goals: 0,
-                              teamName: team?.name || "غير معروف"
-                            };
-                          }
-                          
-                          playerGoals[playerId].goals += 1;
+                      // Group goal events by player-team in this match
+                      const matchPlayerGoals: { [key: string]: { playerId: string, teamId: string, count: number } } = {};
+                      
+                      goalEvents.forEach(event => {
+                        // Normalize player name by converting to lowercase
+                        const normalizedName = event.playerId.toLowerCase().trim();
+                        const key = `${normalizedName}-${event.teamId}`;
+                        
+                        if (!matchPlayerGoals[key]) {
+                          matchPlayerGoals[key] = { 
+                            playerId: event.playerId, 
+                            teamId: event.teamId, 
+                            count: 0 
+                          };
                         }
+                        matchPlayerGoals[key].count++;
+                      });
+                      
+                      // Add goals to global counter
+                      Object.entries(matchPlayerGoals).forEach(([key, data]) => {
+                        const { playerId, teamId, count } = data;
+                        const team = teams.find(t => t._id === teamId);
+                        
+                        // Use normalized name as key
+                        const normalizedName = playerId.toLowerCase().trim();
+                        
+                        if (!playerGoals[normalizedName]) {
+                          playerGoals[normalizedName] = {
+                            name: playerId, // Keep original case for display
+                            goals: 0,
+                            teamName: team?.name || "غير معروف",
+                            matchIds: new Set()
+                          };
+                        }
+                        
+                        playerGoals[normalizedName].goals += count;
+                        playerGoals[normalizedName].matchIds.add(match._id);
                       });
                     }
                   });

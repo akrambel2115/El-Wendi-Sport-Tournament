@@ -12,7 +12,6 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const match = useQuery(api.matches.get, { id: matchId });
   const teams = useQuery(api.teams.list) || [];
-  const staff = useQuery(api.staff.list) || [];
 
   // Close on escape key
   useEffect(() => {
@@ -49,12 +48,6 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
     return team ? team.name : "فريق غير معروف";
   };
 
-  // Helper function to get staff name by ID
-  const getStaffName = (staffId: Id<"staff">) => {
-    const member = staff.find((s) => s._id === staffId);
-    return member ? member.name : "غير معروف";
-  };
-
   // Format dates in French style (DD-MM-YYYY)
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -82,6 +75,27 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
   const teamARedCards = sortedEvents.filter(e => e.type === "redCard" && e.teamId === match.teamAId).length;
   const teamBYellowCards = sortedEvents.filter(e => e.type === "yellowCard" && e.teamId === match.teamBId).length;
   const teamBRedCards = sortedEvents.filter(e => e.type === "redCard" && e.teamId === match.teamBId).length;
+
+  // Group scorers to remove duplicates
+  const uniqueScorers = sortedEvents
+    .filter(e => e.type === "goal")
+    .reduce((acc, event) => {
+      const key = `${event.playerId}-${event.teamId}`;
+      if (!acc[key]) {
+        acc[key] = {
+          playerId: event.playerId,
+          teamId: event.teamId,
+          goals: 1,
+          minutes: [event.minute]
+        };
+      } else {
+        acc[key].goals += 1;
+        acc[key].minutes.push(event.minute);
+      }
+      return acc;
+    }, {} as Record<string, { playerId: string, teamId: Id<"teams">, goals: number, minutes: number[] }>);
+
+  const uniqueScorersList = Object.values(uniqueScorers).sort((a, b) => b.goals - a.goals);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -202,10 +216,10 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
                         {match.stage === "final" && "النهائي"}
                       </span>
                     </div>
-                    {match.referees && match.referees.length > 0 && (
+                    {match.referee && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">الحكام:</span>
-                        <span className="font-medium">{match.referees.map(refId => getStaffName(refId)).join(", ")}</span>
+                        <span className="text-gray-600">الحكم:</span>
+                        <span className="font-medium">{match.referee}</span>
                       </div>
                     )}
                     {match.manOfTheMatch && (
@@ -278,20 +292,21 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
                   <h3 className="text-lg font-semibold mb-3">الأهداف</h3>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="space-y-2">
-                      {sortedEvents
-                        .filter(e => e.type === "goal")
-                        .map((event, index) => (
-                          <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
-                            <div className="flex items-center">
-                              <span className="ml-2">⚽</span>
-                              <span>{event.playerId}</span>
-                              <span className="mr-2 text-gray-500">({event.teamId === match.teamAId ? getTeamName(match.teamAId) : getTeamName(match.teamBId)})</span>
-                            </div>
-                            <div className="bg-blue-100 text-blue-800 text-sm rounded-full px-2 py-1">
-                              {event.minute}'
-                            </div>
+                      {uniqueScorersList.map((scorer, index) => (
+                        <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex items-center">
+                            <span className="ml-2">⚽</span>
+                            <span>{scorer.playerId}</span>
+                            <span className="mr-2 text-gray-500">
+                              ({scorer.teamId === match.teamAId ? getTeamName(match.teamAId) : getTeamName(match.teamBId)})
+                              {scorer.goals > 1 && <span className="mr-1 font-medium"> × {scorer.goals}</span>}
+                            </span>
                           </div>
-                        ))}
+                          <div className="bg-blue-100 text-blue-800 text-sm rounded-full px-2 py-1">
+                            {scorer.minutes.join(', ')}'
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -379,22 +394,23 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
                   <div>
                     <h3 className="text-lg font-semibold mb-3">الهدافين</h3>
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      {sortedEvents.filter(e => e.type === "goal").length > 0 ? (
+                      {uniqueScorersList.length > 0 ? (
                         <div className="space-y-2">
-                          {sortedEvents
-                            .filter(e => e.type === "goal")
-                            .map((event, index) => (
-                              <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
-                                <div className="flex items-center">
-                                  <span className="ml-2">⚽</span>
-                                  <span>{event.playerId}</span>
-                                  <span className="mr-2 text-gray-500">({event.teamId === match.teamAId ? getTeamName(match.teamAId) : getTeamName(match.teamBId)})</span>
-                                </div>
-                                <div className="bg-blue-100 text-blue-800 text-sm rounded-full px-2 py-1">
-                                  {event.minute}'
-                                </div>
+                          {uniqueScorersList.map((scorer, index) => (
+                            <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
+                              <div className="flex items-center">
+                                <span className="ml-2">⚽</span>
+                                <span>{scorer.playerId}</span>
+                                <span className="mr-2 text-gray-500">
+                                  ({scorer.teamId === match.teamAId ? getTeamName(match.teamAId) : getTeamName(match.teamBId)})
+                                  {scorer.goals > 1 && <span className="mr-1 font-medium"> × {scorer.goals}</span>}
+                                </span>
                               </div>
-                            ))}
+                              <div className="bg-blue-100 text-blue-800 text-sm rounded-full px-2 py-1">
+                                {scorer.minutes.join(', ')}'
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <p className="text-gray-500 text-center py-2">لا توجد أهداف في هذه المباراة</p>
