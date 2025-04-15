@@ -50,6 +50,7 @@ export function TournamentProgress() {
   const deleteGroup = useMutation(api.tournament.deleteGroup);
   const assignTeamsToGroups = useMutation(api.tournament.assignTeamsToGroups);
   const syncGroupsAndTeams = useMutation(api.tournament.syncTeamsAndGroups);
+  const syncTeamStats = useMutation(api.tournament.syncTeamStats);
 
   const [editingSettings, setEditingSettings] = useState(false);
   const [newSettings, setNewSettings] = useState<Omit<TournamentSettings, "_id">>({
@@ -70,6 +71,9 @@ export function TournamentProgress() {
   const [groupAssignments, setGroupAssignments] = useState<{
     [teamId: string]: Id<"groups"> | null;
   }>({});
+  
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   // Load tournament settings if they exist
   useEffect(() => {
@@ -262,11 +266,55 @@ export function TournamentProgress() {
     }
   };
 
+  const handleSyncTeamStats = async () => {
+    if (syncing) return;
+    
+    try {
+      setSyncing(true);
+      setSyncMessage("جاري مزامنة إحصائيات الفرق...");
+      
+      const result = await syncTeamStats({});
+      
+      if (result.success) {
+        setSyncMessage(`تم مزامنة إحصائيات الفرق (${result.updatedTeams} تحديث)`);
+        setTimeout(() => setSyncMessage(""), 3000);
+      }
+    } catch (error) {
+      console.error("Error syncing team stats:", error);
+      setSyncMessage("حدث خطأ أثناء مزامنة الإحصائيات");
+      setTimeout(() => setSyncMessage(""), 3000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="border-b pb-4">
         <h2 className="text-2xl font-bold">تقدم البطولة</h2>
         <p className="text-gray-600">إدارة مجموعات ومراحل البطولة</p>
+      </div>
+
+      {/* Actions Row */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button
+          onClick={handleSyncGroupsAndTeams}
+          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+        >
+          مزامنة الفرق والمجموعات
+        </button>
+        <button
+          onClick={handleSyncTeamStats}
+          disabled={syncing}
+          className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:bg-green-300"
+        >
+          {syncing ? "جاري المزامنة..." : "مزامنة إحصائيات الفرق"}
+        </button>
+        {syncMessage && (
+          <span className={`px-3 py-2 rounded-md text-sm ${syncMessage.includes("خطأ") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+            {syncMessage}
+          </span>
+        )}
       </div>
 
       {/* Tournament Settings */}
@@ -427,14 +475,6 @@ export function TournamentProgress() {
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium">إدارة المجموعات</h3>
-            
-            {/* Add a sync button */}
-            <button
-              onClick={handleSyncGroupsAndTeams}
-              className="bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600"
-            >
-              مزامنة الفرق والمجموعات
-            </button>
           </div>
 
           {/* Create Group Form */}
@@ -534,7 +574,7 @@ export function TournamentProgress() {
                     </div>
                   </div>
                   <div className="p-3">
-    <div>
+                    <div>
                       <h6 className="text-sm font-medium mb-1">الفرق:</h6>
                       {getGroupTeams(group._id).length > 0 ? (
                         <ul className="text-sm list-disc list-inside">

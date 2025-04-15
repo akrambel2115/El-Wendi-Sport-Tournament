@@ -264,4 +264,263 @@ export const syncTeamsAndGroups = mutation({
     
     return { success: true, updates };
   }
+});
+
+// Synchronize team statistics based on match data
+export const syncTeamStats = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Fetch all teams and matches
+    const teams = await ctx.db.query("teams").collect();
+    const matches = await ctx.db.query("matches").collect();
+
+    let updatedTeams = 0;
+
+    // Process each team
+    for (const team of teams) {
+      // Reset team stats
+      const teamStats = {
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        points: 0,
+      };
+
+      // Find all completed matches involving this team
+      const teamMatches = matches.filter(
+        match => 
+          match.status === "completed" && 
+          match.score && 
+          (match.teamAId === team._id || match.teamBId === team._id)
+      );
+
+      // Calculate stats from matches
+      for (const match of teamMatches) {
+        // Skip if match doesn't have a valid score object
+        if (!match.score) {
+          console.warn(`Match ${match._id} is marked as completed but has no score. Skipping.`);
+          continue;
+        }
+        
+        // Ensure score properties are valid numbers, default to 0 if not
+        const teamAScore = typeof match.score.teamA === 'number' ? match.score.teamA : 0;
+        const teamBScore = typeof match.score.teamB === 'number' ? match.score.teamB : 0;
+        
+        teamStats.played++;
+
+        if (match.teamAId === team._id) {
+          // Team is Team A
+          teamStats.goalsFor += teamAScore;
+          teamStats.goalsAgainst += teamBScore;
+
+          if (teamAScore > teamBScore) {
+            // Team A won
+            teamStats.won++;
+            teamStats.points += 3;
+          } else if (teamAScore < teamBScore) {
+            // Team A lost
+            teamStats.lost++;
+          } else {
+            // Draw
+            teamStats.drawn++;
+            teamStats.points += 1;
+          }
+        } else {
+          // Team is Team B
+          teamStats.goalsFor += teamBScore;
+          teamStats.goalsAgainst += teamAScore;
+
+          if (teamBScore > teamAScore) {
+            // Team B won
+            teamStats.won++;
+            teamStats.points += 3;
+          } else if (teamBScore < teamAScore) {
+            // Team B lost
+            teamStats.lost++;
+          } else {
+            // Draw
+            teamStats.drawn++;
+            teamStats.points += 1;
+          }
+        }
+      }
+
+      // Update team with new stats
+      const oldStats = team.stats || {};
+      
+      // Check if stats have changed before updating
+      if (
+        oldStats.played !== teamStats.played ||
+        oldStats.won !== teamStats.won ||
+        oldStats.drawn !== teamStats.drawn ||
+        oldStats.lost !== teamStats.lost ||
+        oldStats.goalsFor !== teamStats.goalsFor ||
+        oldStats.goalsAgainst !== teamStats.goalsAgainst ||
+        oldStats.points !== teamStats.points
+      ) {
+        await ctx.db.patch(team._id, { stats: teamStats });
+        updatedTeams++;
+      }
+    }
+
+    return { success: true, updatedTeams };
+  },
+});
+
+// Validate team statistics without making changes (audit function)
+export const validateTeamStats = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("Starting team stats validation...");
+    
+    // Fetch all teams and matches
+    const teams = await ctx.db.query("teams").collect();
+    const matches = await ctx.db.query("matches")
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+      
+    console.log(`Found ${teams.length} teams and ${matches.length} completed matches for validation`);
+    
+    const teamReport = [];
+    let inconsistenciesFound = 0;
+    
+    // Process each team
+    for (const team of teams) {
+      console.log(`Validating stats for team: ${team.name}`);
+      
+      // Calculate expected stats
+      const expectedStats = {
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        points: 0,
+      };
+
+      // Find all completed matches involving this team
+      const teamMatches = matches.filter(
+        match => match.score && (match.teamAId === team._id || match.teamBId === team._id)
+      );
+      
+      console.log(`Found ${teamMatches.length} matches for team ${team.name}`);
+
+      // Calculate expected stats from matches
+      for (const match of teamMatches) {
+        expectedStats.played++;
+
+        if (match.teamAId === team._id) {
+          // Team is Team A
+          expectedStats.goalsFor += match.score?.teamA || 0;
+          expectedStats.goalsAgainst += match.score?.teamB || 0;
+
+          const scoreA = match.score?.teamA ?? 0;
+          const scoreB = match.score?.teamB ?? 0;
+
+          if (scoreA > scoreB) {
+            // Team A won
+            expectedStats.won++;
+            expectedStats.points += 3;
+          } else if (scoreA < scoreB) {
+            // Team A lost
+            expectedStats.lost++;
+          } else {
+            // Draw
+            expectedStats.drawn++;
+            expectedStats.points += 1;
+          }
+        } else {
+          // Team is Team B
+          expectedStats.goalsFor += match.score?.teamB || 0;
+          expectedStats.goalsAgainst += match.score?.teamA || 0;
+
+          const scoreA = match.score?.teamA ?? 0;
+          const scoreB = match.score?.teamB ?? 0;
+
+          if (scoreB > scoreA) {
+            // Team B won
+            expectedStats.won++;
+            expectedStats.points += 3;
+          } else if (scoreB < scoreA) {
+            // Team B lost
+            expectedStats.lost++;
+          } else {
+            // Draw
+            expectedStats.drawn++;
+            expectedStats.points += 1;
+          }
+        }
+      }
+
+      // Get current stats with defaults for missing values
+      const currentStats = team.stats || {
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        points: 0,
+      };
+      
+      // Check for inconsistencies
+      const discrepancies = [];
+      
+      if (currentStats.played !== expectedStats.played) {
+        discrepancies.push(`Played: current=${currentStats.played}, expected=${expectedStats.played}`);
+      }
+      if (currentStats.won !== expectedStats.won) {
+        discrepancies.push(`Won: current=${currentStats.won}, expected=${expectedStats.won}`);
+      }
+      if (currentStats.drawn !== expectedStats.drawn) {
+        discrepancies.push(`Drawn: current=${currentStats.drawn}, expected=${expectedStats.drawn}`);
+      }
+      if (currentStats.lost !== expectedStats.lost) {
+        discrepancies.push(`Lost: current=${currentStats.lost}, expected=${expectedStats.lost}`);
+      }
+      if (currentStats.goalsFor !== expectedStats.goalsFor) {
+        discrepancies.push(`Goals for: current=${currentStats.goalsFor}, expected=${expectedStats.goalsFor}`);
+      }
+      if (currentStats.goalsAgainst !== expectedStats.goalsAgainst) {
+        discrepancies.push(`Goals against: current=${currentStats.goalsAgainst}, expected=${expectedStats.goalsAgainst}`);
+      }
+      if (currentStats.points !== expectedStats.points) {
+        discrepancies.push(`Points: current=${currentStats.points}, expected=${expectedStats.points}`);
+      }
+      
+      if (discrepancies.length > 0) {
+        inconsistenciesFound++;
+        teamReport.push({
+          teamId: team._id,
+          teamName: team.name,
+          hasDiscrepancies: true,
+          discrepancies,
+          currentStats,
+          expectedStats
+        });
+        console.log(`Found ${discrepancies.length} discrepancies for team ${team.name}`);
+      } else {
+        teamReport.push({
+          teamId: team._id,
+          teamName: team.name,
+          hasDiscrepancies: false
+        });
+        console.log(`No discrepancies found for team ${team.name}`);
+      }
+    }
+    
+    console.log(`Validation complete. Found inconsistencies in ${inconsistenciesFound} teams`);
+    
+    return { 
+      success: true,
+      teamsChecked: teams.length,
+      matchesExamined: matches.length,
+      inconsistenciesFound,
+      teamReport
+    };
+  },
 }); 

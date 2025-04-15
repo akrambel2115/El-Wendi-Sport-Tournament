@@ -37,6 +37,7 @@ export function TeamManagement() {
   const createTeam = useMutation(api.teams.create);
   const updateTeam = useMutation(api.teams.update);
   const deleteTeam = useMutation(api.teams.remove);
+  const syncTeamStats = useMutation(api.tournament.syncTeamStats);
 
   const [newTeam, setNewTeam] = useState({
     name: "",
@@ -62,6 +63,9 @@ export function TeamManagement() {
   const [selectedPlayers, setSelectedPlayers] = useState<{
     [teamId: string]: number[];
   }>({});
+  
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,8 +264,53 @@ export function TeamManagement() {
     }
   };
 
+  // Function to handle team stats synchronization
+  const handleSyncTeamStats = async () => {
+    if (syncing) return;
+    
+    try {
+      setSyncing(true);
+      setSyncMessage("جاري مزامنة إحصائيات الفرق...");
+      
+      const result = await syncTeamStats({});
+      
+      if (result.success) {
+        setSyncMessage(`تم مزامنة إحصائيات الفرق (${result.updatedTeams} تحديث)`);
+        setTimeout(() => setSyncMessage(""), 3000);
+      }
+    } catch (error) {
+      console.error("Error syncing team stats:", error);
+      setSyncMessage("حدث خطأ أثناء مزامنة الإحصائيات");
+      setTimeout(() => setSyncMessage(""), 3000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Section Title */}
+      <div className="border-b pb-4 flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">إدارة الفرق</h2>
+          <p className="text-gray-600">إضافة وتعديل الفرق واللاعبين</p>
+        </div>
+        <div className="flex items-center">
+          {syncMessage && (
+            <span className={`ml-3 px-3 py-1 rounded-md text-sm ${syncMessage.includes("خطأ") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+              {syncMessage}
+            </span>
+          )}
+          <button
+            onClick={handleSyncTeamStats}
+            disabled={syncing}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-blue-300 ml-3"
+          >
+            {syncing ? "جاري المزامنة..." : "مزامنة الإحصائيات"}
+          </button>
+        </div>
+      </div>
+
       <form onSubmit={handleCreateTeam} className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">اسم الفريق</label>

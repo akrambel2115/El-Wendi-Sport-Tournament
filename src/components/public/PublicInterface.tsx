@@ -7,15 +7,19 @@ import { MatchDetail } from "./MatchDetail";
 
 export function PublicInterface() {
   const matches = useQuery(api.matches.list) || [];
+  const upcomingMatchesData = useQuery(api.matches.getUpcoming) || [];
   const teams = useQuery(api.teams.list) || [];
   const tournamentGroups = useQuery(api.tournament.listGroups) || [];
   const tournament = useQuery(api.tournament.get);
   const syncGroups = useMutation(api.tournament.syncTeamsAndGroups);
+  const syncTeamStats = useMutation(api.tournament.syncTeamStats);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedMatchId, setSelectedMatchId] = useState<Id<"matches"> | null>(null);
   const [standingsDisplayMode, setStandingsDisplayMode] = useState<"byGroup" | "allTeams">("byGroup");
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const [syncing, setSyncing] = useState(false);
+  const [syncingStats, setSyncingStats] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   // Auto-sync groups and teams when page loads
   useEffect(() => {
@@ -44,6 +48,29 @@ export function PublicInterface() {
     }
   };
 
+  // Function to handle team stats synchronization
+  const handleSyncTeamStats = async () => {
+    if (syncingStats) return;
+    
+    try {
+      setSyncingStats(true);
+      setSyncMessage("جاري مزامنة إحصائيات الفرق...");
+      
+      const result = await syncTeamStats({});
+      
+      if (result.success) {
+        setSyncMessage(`تم مزامنة إحصائيات الفرق (${result.updatedTeams} تحديث)`);
+        setTimeout(() => setSyncMessage(""), 3000);
+      }
+    } catch (error) {
+      console.error("Error syncing team stats:", error);
+      setSyncMessage("حدث خطأ أثناء مزامنة الإحصائيات");
+      setTimeout(() => setSyncMessage(""), 3000);
+    } finally {
+      setSyncingStats(false);
+    }
+  };
+
   // Helper function to get team name by ID
   const getTeamName = (teamId: Id<"teams">) => {
     const team = teams.find((t) => t._id === teamId);
@@ -60,10 +87,7 @@ export function PublicInterface() {
   };
 
   // Get upcoming matches (limit to 5)
-  const upcomingMatches = matches
-    .filter((match) => match.status !== "completed")
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+  const upcomingMatches = upcomingMatchesData.slice(0, 5);
 
   // Get recent results (limit to 5)
   const recentResults = matches
@@ -72,9 +96,7 @@ export function PublicInterface() {
     .slice(0, 5);
 
   // Get all upcoming matches for the matches tab
-  const allUpcomingMatches = matches
-    .filter((match) => match.status !== "completed")
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const allUpcomingMatches = upcomingMatchesData;
 
   // Get all completed matches for the matches tab
   const allCompletedMatches = matches
@@ -845,64 +867,75 @@ export function PublicInterface() {
         {/* Standings Tab */}
         {activeTab === "standings" && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 text-white flex justify-between items-center">
-              <h2 className="text-2xl font-bold">ترتيب الفرق</h2>
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => handleSyncGroups()}
-                  disabled={syncing}
-                  className="mr-4 ml-2 px-3 py-1 text-xs bg-white text-purple-600 rounded hover:bg-gray-100"
-                  title="مزامنة المجموعات والفرق"
-                >
-                  {syncing ? "جاري المزامنة..." : "مزامنة"}
-                </button>
-                <div className="flex items-center ml-4">
-                  <span className="text-sm font-medium ml-2 text-white">طريقة العرض:</span>
-                  <div className="flex border rounded-md overflow-hidden">
-                    <button
-                      onClick={() => setStandingsDisplayMode("byGroup")}
-                      className={`px-3 py-1 text-sm ${
-                        standingsDisplayMode === "byGroup" 
-                          ? "bg-white text-purple-600" 
-                          : "bg-purple-400 text-white hover:bg-purple-300"
-                      }`}
-                    >
-                      حسب المجموعات
-                    </button>
-                    <button
-                      onClick={() => setStandingsDisplayMode("allTeams")}
-                      className={`px-3 py-1 text-sm ${
-                        standingsDisplayMode === "allTeams" 
-                          ? "bg-white text-purple-600" 
-                          : "bg-purple-400 text-white hover:bg-purple-300"
-                      }`}
-                    >
-                      كل الفرق معاً
-                    </button>
-                  </div>
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold">ترتيب الفرق</h2>
+              </div>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div>
+                  {syncMessage && (
+                    <span className={`px-3 py-1 rounded-md text-sm bg-white/20 backdrop-blur-sm inline-block mb-2 md:mb-0`}>
+                      {syncMessage}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSyncTeamStats}
+                    disabled={syncingStats}
+                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-md mr-4 mb-2 md:mb-0 text-sm disabled:opacity-50"
+                  >
+                    {syncingStats ? "جاري المزامنة..." : "مزامنة الإحصائيات"}
+                  </button>
                 </div>
-                
-                {/* Group selector - shown only in byGroup mode */}
-                {standingsDisplayMode === "byGroup" && (
+                {/* Display mode selector */}
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                   <div className="flex items-center">
-                    <span className="text-sm font-medium ml-2 text-white">المجموعة:</span>
-                    <select
-                      value={selectedGroup}
-                      onChange={(e) => setSelectedGroup(e.target.value)}
-                      className="p-1 text-sm border rounded-md text-gray-800 bg-white"
-                    >
-                      <option value="all">كل المجموعات</option>
-                      {tournamentGroups && tournamentGroups.map((group) => (
-                        <option key={group._id.toString()} value={group.name}>
-                          {`المجموعة ${group.name}`}
-                        </option>
-                      ))}
-                      {Object.keys(groupedTeams || {}).includes("بدون مجموعة") && (
-                        <option value="بدون مجموعة">بدون مجموعة</option>
-                      )}
-                    </select>
+                    <span className="text-sm font-medium ml-2 text-white">طريقة العرض:</span>
+                    <div className="flex border rounded-md overflow-hidden">
+                      <button
+                        onClick={() => setStandingsDisplayMode("byGroup")}
+                        className={`px-3 py-1 text-sm ${
+                          standingsDisplayMode === "byGroup" 
+                            ? "bg-white text-purple-600" 
+                            : "bg-purple-400 text-white hover:bg-purple-300"
+                        }`}
+                      >
+                        حسب المجموعات
+                      </button>
+                      <button
+                        onClick={() => setStandingsDisplayMode("allTeams")}
+                        className={`px-3 py-1 text-sm ${
+                          standingsDisplayMode === "allTeams" 
+                            ? "bg-white text-purple-600" 
+                            : "bg-purple-400 text-white hover:bg-purple-300"
+                        }`}
+                      >
+                        كل الفرق معاً
+                      </button>
+                    </div>
                   </div>
-                )}
+                  
+                  {/* Group selector - shown only in byGroup mode */}
+                  {standingsDisplayMode === "byGroup" && (
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium ml-2 text-white">المجموعة:</span>
+                      <select
+                        value={selectedGroup}
+                        onChange={(e) => setSelectedGroup(e.target.value)}
+                        className="p-1 text-sm border rounded-md text-gray-800 bg-white"
+                      >
+                        <option value="all">كل المجموعات</option>
+                        {tournamentGroups && tournamentGroups.map((group) => (
+                          <option key={group._id.toString()} value={group.name}>
+                            {`المجموعة ${group.name}`}
+                          </option>
+                        ))}
+                        {Object.keys(groupedTeams || {}).includes("بدون مجموعة") && (
+                          <option value="بدون مجموعة">بدون مجموعة</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="p-6">
@@ -1452,15 +1485,15 @@ export function PublicInterface() {
                 
                 {/* Developer Credits Section */}
                 <div className="mt-12 border-t pt-6">
-                  <h4 className="text-lg font-bold mb-3">تطوير الموقع</h4>
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-sm">
-                    <div className="flex flex-col md:flex-row items-center">
-                      <div className="mb-4 md:mb-0 md:mr-6">
+                  <h4 className="text-lg font-bold mb-3 text-center">تطوير الموقع</h4>
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-sm max-w-2xl mx-auto">
+                    <div className="flex flex-col items-center text-center">
+                      <div className="mb-4">
                         <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
                           ب.أ.خ
                         </div>
                       </div>
-                      <div className="text-center md:text-left">
+                      <div className="text-center">
                         <h5 className="text-xl font-bold text-gray-800">بلبخوش أكرم خالد</h5>
                         <p className="text-indigo-600 mb-2">طالب الذكاء الاصطناعي في المدرسة الوطنية العليا للذكاء الاصطناعي ENSIA</p>
                         <a 

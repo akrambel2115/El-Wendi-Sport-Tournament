@@ -12,6 +12,7 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const match = useQuery(api.matches.get, { id: matchId });
   const teams = useQuery(api.teams.list) || [];
+  const staff = useQuery(api.staff.list) || [];
 
   // Close on escape key
   useEffect(() => {
@@ -46,6 +47,12 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
   const getTeamName = (teamId: Id<"teams">) => {
     const team = teams.find((t) => t._id === teamId);
     return team ? team.name : "فريق غير معروف";
+  };
+
+  // Helper function to get staff name by ID
+  const getStaffName = (staffId: Id<"staff">) => {
+    const member = staff.find((s) => s._id === staffId);
+    return member ? member.name : "غير معروف";
   };
 
   // Format dates in French style (DD-MM-YYYY)
@@ -195,10 +202,10 @@ export function MatchDetail({ matchId, onClose }: MatchDetailProps) {
                         {match.stage === "final" && "النهائي"}
                       </span>
                     </div>
-                    {match.referee && (
+                    {match.referees && match.referees.length > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">الحكم:</span>
-                        <span className="font-medium">{match.referee}</span>
+                        <span className="text-gray-600">الحكام:</span>
+                        <span className="font-medium">{match.referees.map(refId => getStaffName(refId)).join(", ")}</span>
                       </div>
                     )}
                     {match.manOfTheMatch && (

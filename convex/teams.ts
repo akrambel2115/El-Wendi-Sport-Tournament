@@ -178,3 +178,107 @@ export const remove = mutation({
     await ctx.db.delete(args.teamId);
   },
 });
+
+export const syncTeamStats = mutation({
+  handler: async (ctx) => {
+    try {
+      console.log("Starting full team stats synchronization...");
+      
+      // Get all teams
+      const teams = await ctx.db.query("teams").collect();
+      console.log(`Found ${teams.length} teams to synchronize`);
+      
+      // Get all completed matches
+      const matches = await ctx.db
+        .query("matches")
+        .filter((q) => q.eq(q.field("status"), "completed"))
+        .collect();
+      console.log(`Found ${matches.length} completed matches for calculation`);
+
+      // Initialize stats for all teams
+      const teamStatMap = new Map();
+      
+      for (const team of teams) {
+        teamStatMap.set(team._id, {
+          played: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          points: 0,
+        });
+      }
+      
+      // Calculate stats based on all completed matches
+      for (const match of matches) {
+        if (!match.score) {
+          console.warn(`Match ${match._id} is marked as completed but has no score`);
+          continue;
+        }
+
+        const teamAId = match.teamAId;
+        const teamBId = match.teamBId;
+        
+        // Skip if teams not found in our map (which shouldn't happen)
+        if (!teamStatMap.has(teamAId) || !teamStatMap.has(teamBId)) {
+          console.warn(`Match ${match._id} references non-existent teams: A=${teamAId}, B=${teamBId}`);
+          continue;
+        }
+        
+        const teamAStats = teamStatMap.get(teamAId);
+        const teamBStats = teamStatMap.get(teamBId);
+        
+        // Increment played count
+        teamAStats.played += 1;
+        teamBStats.played += 1;
+        
+        // Add goals
+        teamAStats.goalsFor += match.score.teamA;
+        teamAStats.goalsAgainst += match.score.teamB;
+        teamBStats.goalsFor += match.score.teamB;
+        teamBStats.goalsAgainst += match.score.teamA;
+        
+        // Determine match result
+        if (match.score.teamA > match.score.teamB) {
+          // Team A won
+          teamAStats.won += 1;
+          teamAStats.points += 3;
+          teamBStats.lost += 1;
+        } else if (match.score.teamA < match.score.teamB) {
+          // Team B won
+          teamBStats.won += 1;
+          teamBStats.points += 3;
+          teamAStats.lost += 1;
+        } else {
+          // Draw
+          teamAStats.drawn += 1;
+          teamBStats.drawn += 1;
+          teamAStats.points += 1;
+          teamBStats.points += 1;
+        }
+      }
+      
+      // Update all teams with their calculated stats
+      const updates = [];
+      for (const team of teams) {
+        const newStats = teamStatMap.get(team._id);
+        console.log(`Updating team ${team.name} with stats:`, newStats);
+        updates.push(ctx.db.patch(team._id, { stats: newStats }));
+      }
+      
+      // Wait for all updates to complete
+      await Promise.all(updates);
+      
+      console.log("Team stats synchronization completed successfully");
+      return { 
+        success: true, 
+        teamsUpdated: teams.length,
+        matchesProcessed: matches.length 
+      };
+    } catch (error) {
+      console.error("Error synchronizing team stats:", error);
+      throw new Error(`Failed to synchronize team stats: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  },
+});

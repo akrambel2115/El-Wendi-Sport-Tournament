@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -54,6 +54,10 @@ interface PlayerCards {
 }
 
 export function Statistics() {
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
+  const [validating, setValidating] = useState(false);
+  
   const teams = useQuery(api.teams.list) || [];
   const matches = useQuery(api.matches.list) || [];
   const tournamentGroups = useQuery(api.tournament.listGroups) || [];
@@ -61,6 +65,8 @@ export function Statistics() {
   const [displayMode, setDisplayMode] = useState<"byGroup" | "allTeams">("byGroup");
   const [showPrintView, setShowPrintView] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const syncTeamStats = useMutation(api.tournament.syncTeamStats);
+  const validateTeamStats = useMutation(api.tournament.validateTeamStats);
 
   // Format the group data for display
   const formattedGroups = tournamentGroups.map(group => ({
@@ -233,20 +239,82 @@ export function Statistics() {
     value: team.stats.goalsFor - team.stats.goalsAgainst
   })).sort((a, b) => b.value - a.value).slice(0, 10);
 
+  // Function to sync team statistics
+  const handleSyncTeamStats = async () => {
+    setSyncing(true);
+    setSyncMessage("");
+    
+    try {
+      const result = await syncTeamStats({});
+      if (result.success) {
+        setSyncMessage(`تم مزامنة إحصائيات الفرق (${result.updatedTeams} تحديث)`);
+        setTimeout(() => setSyncMessage(""), 3000);
+      }
+    } catch (error) {
+      console.error("Error syncing team stats:", error);
+      setSyncMessage("حدث خطأ أثناء المزامنة");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Function to validate team statistics
+  const handleValidateTeamStats = async () => {
+    setValidating(true);
+    setSyncMessage("");
+    
+    try {
+      const result = await validateTeamStats({});
+      if (result.inconsistenciesFound > 0) {
+        setSyncMessage(`تم العثور على ${result.inconsistenciesFound} اختلافات في الإحصائيات`);
+      } else {
+        setSyncMessage("تم التحقق من الإحصائيات، كل شيء متطابق");
+      }
+      // Keep message visible longer for validation results
+      setTimeout(() => setSyncMessage(""), 5000);
+    } catch (error) {
+      console.error("Error validating team stats:", error);
+      setSyncMessage("حدث خطأ أثناء التحقق من الإحصائيات");
+    } finally {
+      setValidating(false);
+    }
+  };
+
   return (
     <div ref={printRef} className={`space-y-6 ${showPrintView ? 'print-view' : ''}`}>
       {/* Section Title and Print Button */}
       <div className="border-b pb-4 flex justify-between items-center">
-    <div>
+        <div>
           <h2 className="text-2xl font-bold">إحصائيات البطولة</h2>
           <p className="text-gray-600">ترتيب الفرق، الهدافين، واحصائيات عامة</p>
         </div>
-        <button 
-          onClick={handlePrint}
-          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 print:hidden"
-        >
-          طباعة التقرير
-        </button>
+        <div className="flex items-center space-x-3">
+          {syncMessage && (
+            <span className={`ml-3 px-3 py-1 rounded-md text-sm ${syncMessage.includes("خطأ") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+              {syncMessage}
+            </span>
+          )}
+          <button
+            onClick={handleValidateTeamStats}
+            disabled={validating || syncing}
+            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 ml-2"
+          >
+            {validating ? "جاري التحقق..." : "التحقق من الإحصائيات"}
+          </button>
+          <button
+            onClick={handleSyncTeamStats}
+            disabled={syncing || validating}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-blue-300 ml-3"
+          >
+            {syncing ? "جاري المزامنة..." : "مزامنة إحصائيات الفرق"}
+          </button>
+          <button 
+            onClick={handlePrint}
+            className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+          >
+            طباعة الإحصائيات
+          </button>
+        </div>
       </div>
 
       {/* Tournament Summary Statistics */}

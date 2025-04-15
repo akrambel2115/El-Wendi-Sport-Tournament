@@ -34,6 +34,7 @@ interface Match {
 
 export function MatchScheduling() {
   const matches = useQuery(api.matches.list) || [];
+  const upcomingMatches = useQuery(api.matches.getUpcoming) || [];
   const teams = useQuery(api.teams.list) || [];
   const staff = useQuery(api.staff.list) || [];
   const groups = useQuery(api.tournament.listGroups) || [];
@@ -43,6 +44,7 @@ export function MatchScheduling() {
   const deleteMatch = useMutation(api.matches.remove);
   const updateScore = useMutation(api.matches.updateScore);
   const recordMatchResult = useMutation(api.matches.recordMatchResult);
+  const syncTeamStats = useMutation(api.tournament.syncTeamStats);
 
   const [newMatch, setNewMatch] = useState({
     date: "",
@@ -192,6 +194,9 @@ export function MatchScheduling() {
         manOfTheMatch: matchResult.manOfTheMatch
       });
       
+      // Always sync team stats after recording match results to ensure consistency
+      await syncTeamStats({});
+      
       console.log("Match result updated:", result);
       setShowResultForm(false);
       setEditingMatch(null);
@@ -201,6 +206,12 @@ export function MatchScheduling() {
         manOfTheMatch: ""
       });
       alert("تم تسجيل نتيجة المباراة بنجاح");
+      
+      // Ensure UI is refreshed after saving results
+      if (typeof window !== 'undefined') {
+        // Allow UI to update first
+        setTimeout(() => window.location.reload(), 500);
+      }
     } catch (error) {
       console.error("Error updating match result:", error);
       alert("حدث خطأ أثناء تسجيل نتيجة المباراة");
@@ -650,7 +661,7 @@ export function MatchScheduling() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        التاريخ والوقت
+                        التاريخ
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         المباراة
@@ -667,9 +678,7 @@ export function MatchScheduling() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {matches
-                      .filter((match) => match.status !== "completed")
-                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    {upcomingMatches
                       .map((match) => (
                         <tr key={match._id}>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -712,7 +721,30 @@ export function MatchScheduling() {
                               تسجيل النتيجة
                             </button>
                             <button
-                              onClick={() => deleteMatch({ matchId: match._id })}
+                              onClick={async () => {
+                                if (window.confirm(`هل أنت متأكد من حذف مباراة ${getTeamName(match.teamAId)} ضد ${getTeamName(match.teamBId)}؟`)) {
+                                  try {
+                                    // First delete the match
+                                    await deleteMatch({ matchId: match._id });
+                                    console.log("Match deleted successfully, now syncing team stats");
+                                    
+                                    // Add a longer delay to ensure the database has processed the deletion
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                    
+                                    // Then sync team stats to ensure everything is consistent
+                                    const syncResult = await syncTeamStats({});
+                                    console.log("Team stats sync result:", syncResult);
+                                    
+                                    alert("تم حذف المباراة بنجاح");
+                                    
+                                    // Force a full page reload to ensure fresh data
+                                    window.location.reload();
+                                  } catch (error) {
+                                    console.error("Error deleting match:", error);
+                                    alert("حدث خطأ أثناء حذف المباراة");
+                                  }
+                                }
+                              }}
                               className="text-red-600 hover:text-red-900 mx-1"
                             >
                               حذف
@@ -835,7 +867,30 @@ export function MatchScheduling() {
                                 تعديل النتيجة
                               </button>
                               <button
-                                onClick={() => deleteMatch({ matchId: match._id })}
+                                onClick={async () => {
+                                  if (window.confirm(`هل أنت متأكد من حذف مباراة ${getTeamName(match.teamAId)} ضد ${getTeamName(match.teamBId)}؟`)) {
+                                    try {
+                                      // First delete the match
+                                      await deleteMatch({ matchId: match._id });
+                                      console.log("Match deleted successfully, now syncing team stats");
+                                      
+                                      // Add a longer delay to ensure the database has processed the deletion
+                                      await new Promise(resolve => setTimeout(resolve, 1000));
+                                      
+                                      // Then sync team stats to ensure everything is consistent
+                                      const syncResult = await syncTeamStats({});
+                                      console.log("Team stats sync result:", syncResult);
+                                      
+                                      alert("تم حذف المباراة بنجاح");
+                                      
+                                      // Force a full page reload to ensure fresh data
+                                      window.location.reload();
+                                    } catch (error) {
+                                      console.error("Error deleting match:", error);
+                                      alert("حدث خطأ أثناء حذف المباراة");
+                                    }
+                                  }
+                                }}
                                 className="text-red-600 hover:text-red-900 mx-1"
                               >
                                 حذف
