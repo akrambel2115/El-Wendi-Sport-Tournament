@@ -20,7 +20,6 @@ import type * as init from "../init.js";
 import type * as matches from "../matches.js";
 import type * as staff from "../staff.js";
 import type * as teams from "../teams.js";
-import type * as tempCodeRunnerFile from "../tempCodeRunnerFile.js";
 import type * as tournament from "../tournament.js";
 import type * as users from "../users.js";
 
@@ -40,7 +39,6 @@ declare const fullApi: ApiFromModules<{
   matches: typeof matches;
   staff: typeof staff;
   teams: typeof teams;
-  tempCodeRunnerFile: typeof tempCodeRunnerFile;
   tournament: typeof tournament;
   users: typeof users;
 }>;
