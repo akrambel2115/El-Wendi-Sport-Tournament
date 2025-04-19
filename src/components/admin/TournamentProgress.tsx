@@ -51,6 +51,7 @@ export function TournamentProgress() {
   const assignTeamsToGroups = useMutation(api.tournament.assignTeamsToGroups);
   const syncGroupsAndTeams = useMutation(api.tournament.syncTeamsAndGroups);
   const syncTeamStats = useMutation(api.tournament.syncTeamStats);
+  const updateGroupName = useMutation(api.tournament.updateGroupName);
 
   const [editingSettings, setEditingSettings] = useState(false);
   const [newSettings, setNewSettings] = useState<Omit<TournamentSettings, "_id">>({
@@ -75,11 +76,13 @@ export function TournamentProgress() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
-  // Add state for editing teams in a group
+  // Add state for editing groups
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editingGroupTeams, setEditingGroupTeams] = useState<{
     [teamId: string]: boolean;
   }>({});
+  // Add state for editing group name
+  const [editingGroupName, setEditingGroupName] = useState("");
 
   // Load tournament settings if they exist
   useEffect(() => {
@@ -294,9 +297,10 @@ export function TournamentProgress() {
     }
   };
 
-  // Add handler for editing teams in a group
+  // Update handler for editing teams in a group
   const handleEditTeams = (group: Group) => {
     setEditingGroup(group);
+    setEditingGroupName(group.name); // Initialize with current name
     
     // Initialize the state with current team assignments
     const initialTeams: { [teamId: string]: boolean } = {};
@@ -310,11 +314,14 @@ export function TournamentProgress() {
     setEditingGroupTeams(initialTeams);
   };
 
-  // Add handler for saving team changes
+  // Update handler for saving team changes
   const handleSaveTeamChanges = async () => {
     if (!editingGroup) return;
     
     try {
+      // Show saving indicator
+      setSyncMessage("جاري حفظ التغييرات...");
+      
       // Prepare assignments array - only include teams being assigned to this group
       // Don't try to set null groupId as it's not accepted by the API
       const assignments = teams
@@ -324,15 +331,21 @@ export function TournamentProgress() {
           groupId: editingGroup._id,
         }));
       
-      // Show saving indicator
-      setSyncMessage("جاري حفظ التغييرات...");
-      
-      // Save the changes
+      // Update team assignments
       await assignTeamsToGroups({ assignments });
+      
+      // Update group name if it changed
+      if (editingGroupName !== editingGroup.name) {
+        await updateGroupName({
+          groupId: editingGroup._id,
+          newName: editingGroupName
+        });
+      }
       
       // Close the modal
       setEditingGroup(null);
       setEditingGroupTeams({});
+      setEditingGroupName("");
       
       // Sync to ensure consistency
       await syncGroupsAndTeams({});
@@ -781,8 +794,21 @@ export function TournamentProgress() {
       {editingGroup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">تعديل فرق المجموعة {editingGroup.name}</h3>
+            <h3 className="text-xl font-bold mb-4">تعديل المجموعة</h3>
             
+            {/* Add group name field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">اسم المجموعة</label>
+              <input
+                type="text"
+                value={editingGroupName}
+                onChange={(e) => setEditingGroupName(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                placeholder="اسم المجموعة"
+              />
+            </div>
+            
+            <h4 className="font-medium mb-2">الفرق في المجموعة</h4>
             <div className="space-y-2 mb-6">
               {teams.map(team => (
                 <div key={team._id} className="flex items-center p-2 border-b">
@@ -810,6 +836,7 @@ export function TournamentProgress() {
                 onClick={() => {
                   setEditingGroup(null);
                   setEditingGroupTeams({});
+                  setEditingGroupName("");
                 }}
                 className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 ml-2"
               >

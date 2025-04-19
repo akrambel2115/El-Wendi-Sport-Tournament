@@ -523,4 +523,42 @@ export const validateTeamStats = mutation({
       teamReport
     };
   },
+});
+
+// Update a group's name
+export const updateGroupName = mutation({
+  args: {
+    groupId: v.id("groups"),
+    newName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get the group
+    const group = await ctx.db.get(args.groupId);
+    if (!group) {
+      throw new Error("Group not found");
+    }
+    
+    // Store the old name
+    const oldName = group.name;
+    
+    // Update the group's name
+    await ctx.db.patch(args.groupId, {
+      name: args.newName,
+    });
+    
+    // Update all teams that have this group name as groupId
+    const teams = await ctx.db
+      .query("teams")
+      .filter((q) => q.eq(q.field("groupId"), oldName))
+      .collect();
+    
+    // Update each team with the new group name
+    for (const team of teams) {
+      await ctx.db.patch(team._id, {
+        groupId: args.newName,
+      });
+    }
+    
+    return { success: true, teamsUpdated: teams.length };
+  },
 }); 
