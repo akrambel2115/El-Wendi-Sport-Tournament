@@ -75,6 +75,12 @@ export function TournamentProgress() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
+  // Add state for editing teams in a group
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editingGroupTeams, setEditingGroupTeams] = useState<{
+    [teamId: string]: boolean;
+  }>({});
+
   // Load tournament settings if they exist
   useEffect(() => {
     if (tournament) {
@@ -285,6 +291,59 @@ export function TournamentProgress() {
       setTimeout(() => setSyncMessage(""), 3000);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Add handler for editing teams in a group
+  const handleEditTeams = (group: Group) => {
+    setEditingGroup(group);
+    
+    // Initialize the state with current team assignments
+    const initialTeams: { [teamId: string]: boolean } = {};
+    teams.forEach(team => {
+      // Check if team is in this group
+      const isInGroup = group.teams.includes(team._id as Id<"teams">) || 
+                         (team.groupId && team.groupId === group.name);
+      initialTeams[team._id] = isInGroup;
+    });
+    
+    setEditingGroupTeams(initialTeams);
+  };
+
+  // Add handler for saving team changes
+  const handleSaveTeamChanges = async () => {
+    if (!editingGroup) return;
+    
+    try {
+      // Prepare assignments array - only include teams being assigned to this group
+      // Don't try to set null groupId as it's not accepted by the API
+      const assignments = teams
+        .filter(team => editingGroupTeams[team._id]) // Only include teams that should be in this group
+        .map(team => ({
+          teamId: team._id as Id<"teams">,
+          groupId: editingGroup._id,
+        }));
+      
+      // Show saving indicator
+      setSyncMessage("جاري حفظ التغييرات...");
+      
+      // Save the changes
+      await assignTeamsToGroups({ assignments });
+      
+      // Close the modal
+      setEditingGroup(null);
+      setEditingGroupTeams({});
+      
+      // Sync to ensure consistency
+      await syncGroupsAndTeams({});
+      
+      // Show success message
+      setSyncMessage("تم حفظ تغييرات المجموعة بنجاح");
+      setTimeout(() => setSyncMessage(""), 3000);
+    } catch (error) {
+      console.error("Error updating group teams:", error);
+      setSyncMessage("حدث خطأ أثناء حفظ التغييرات");
+      setTimeout(() => setSyncMessage(""), 3000);
     }
   };
 
@@ -557,6 +616,12 @@ export function TournamentProgress() {
                   <div className="bg-gray-100 p-3 flex justify-between items-center">
                     <h5 className="font-medium">المجموعة {group.name}</h5>
                     <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEditTeams(group)}
+                        className="text-sm bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 ml-2"
+                      >
+                        تعديل الفرق
+                      </button>
                       {!group.completed && (
                         <button
                           onClick={() => handleCompleteGroup(group._id)}
@@ -709,6 +774,55 @@ export function TournamentProgress() {
           )}
           
           {/* Similar UI for other stages */}
+        </div>
+      )}
+
+      {/* Modal for editing teams in a group */}
+      {editingGroup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">تعديل فرق المجموعة {editingGroup.name}</h3>
+            
+            <div className="space-y-2 mb-6">
+              {teams.map(team => (
+                <div key={team._id} className="flex items-center p-2 border-b">
+                  <input
+                    type="checkbox"
+                    id={`team-${team._id}`}
+                    checked={editingGroupTeams[team._id] || false}
+                    onChange={(e) => {
+                      setEditingGroupTeams({
+                        ...editingGroupTeams,
+                        [team._id]: e.target.checked
+                      });
+                    }}
+                    className="ml-3"
+                  />
+                  <label htmlFor={`team-${team._id}`} className="flex-1 cursor-pointer">
+                    {team.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setEditingGroup(null);
+                  setEditingGroupTeams({});
+                }}
+                className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 ml-2"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleSaveTeamChanges}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                حفظ التغييرات
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
