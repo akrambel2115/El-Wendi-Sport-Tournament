@@ -23,6 +23,8 @@ export function PublicInterface() {
   // State for screenshot modal
   const [screenshotGroup, setScreenshotGroup] = useState<string | null>(null);
   const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  // Add new states to track orientation
+  const [originalOrientation, setOriginalOrientation] = useState<string | null>(null);
 
   // Auto-sync groups and teams when page loads
   useEffect(() => {
@@ -167,8 +169,49 @@ export function PublicInterface() {
   
   // Function to handle screenshot button click
   const handleScreenshotClick = (groupId: string) => {
+    // Save current orientation before changing it
+    if (window.screen && 'orientation' in window.screen) {
+      setOriginalOrientation((window.screen.orientation as any).type);
+      
+      // Try to lock to landscape if on mobile
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        try {
+          // Use type assertion for the Screen Orientation API
+          (window.screen.orientation as any).lock('landscape').catch((error: Error) => {
+            console.error("Failed to lock screen orientation:", error);
+          });
+        } catch (error: unknown) {
+          console.error("Screen Orientation API not supported:", error);
+        }
+      }
+    }
+    
     setScreenshotGroup(groupId);
     setShowScreenshotModal(true);
+  };
+  
+  // Function to handle closing the screenshot modal
+  const handleCloseScreenshotModal = () => {
+    // Return to original orientation if we changed it
+    if (originalOrientation && window.screen && 'orientation' in window.screen) {
+      try {
+        // Use type assertion for the Screen Orientation API
+        (window.screen.orientation as any).unlock();
+        
+        // Some devices/browsers need an explicit return to the original orientation
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          // Force a small delay for iOS devices
+          setTimeout(() => {
+            (window.screen.orientation as any).unlock();
+          }, 300);
+        }
+      } catch (error: unknown) {
+        console.error("Error unlocking screen orientation:", error);
+      }
+    }
+    
+    setShowScreenshotModal(false);
+    setScreenshotGroup(null);
   };
 
   return (
@@ -1714,7 +1757,7 @@ export function PublicInterface() {
             
             <div className="mt-6 flex justify-center">
               <button
-                onClick={() => setShowScreenshotModal(false)}
+                onClick={handleCloseScreenshotModal}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 إغلاق
