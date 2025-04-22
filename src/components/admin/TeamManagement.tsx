@@ -38,6 +38,7 @@ export function TeamManagement() {
   const updateTeam = useMutation(api.teams.update);
   const deleteTeam = useMutation(api.teams.remove);
   const syncTeamStats = useMutation(api.tournament.syncTeamStats);
+  const tournament = useQuery(api.tournament.get);
 
   const [newTeam, setNewTeam] = useState({
     name: "",
@@ -67,6 +68,9 @@ export function TeamManagement() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
+  // Get maxPlayersPerTeam from tournament settings or default to 10
+  const maxPlayersPerTeam = tournament?.settings?.maxPlayersPerTeam || 10;
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTeam.name.trim()) {
@@ -90,7 +94,8 @@ export function TeamManagement() {
   const handleAddPlayer = (teamId: Id<"teams">) => {
     if (newPlayer.fullName) {
       const team = teams.find((t) => t._id === teamId);
-      if (team && team.players.length < 10) {
+      
+      if (team && team.players.length < maxPlayersPerTeam) {
         const playerWithPaymentDate = newPlayer as Player;
         
         updateTeam({
@@ -104,6 +109,8 @@ export function TeamManagement() {
           photoUrl: "",
         });
         setShowAddPlayer(false);
+      } else if (team && team.players.length >= maxPlayersPerTeam) {
+        alert(`عذراً، لا يمكن إضافة المزيد من اللاعبين. الحد الأقصى هو ${maxPlayersPerTeam} لاعبين.`);
       }
     }
   };
@@ -353,7 +360,7 @@ export function TeamManagement() {
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <h4 className="font-medium">اللاعبين ({team.players.length}/10)</h4>
+                <h4 className="font-medium">اللاعبين ({team.players.length}/{maxPlayersPerTeam})</h4>
                 
                 {getSelectedPlayersCount(team._id) > 0 && (
                   <div className="flex space-x-2">
@@ -464,7 +471,7 @@ export function TeamManagement() {
                 </div>
               )}
 
-              {team.players.length < 10 && (
+              {team.players.length < maxPlayersPerTeam && (
                 <button
                   onClick={() => {
                     setShowAddPlayer(true);
