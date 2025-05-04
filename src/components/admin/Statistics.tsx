@@ -280,6 +280,41 @@ export function Statistics() {
     }
   };
 
+  const getThirdPlaceTeams = () => {
+    // Collect all third-place teams from each group
+    const thirdPlaceTeams: {groupId: string, team: Team}[] = [];
+    
+    Object.keys(groupedTeams).forEach(groupId => {
+      if (groupedTeams[groupId].length >= 3) {
+        thirdPlaceTeams.push({
+          groupId,
+          team: groupedTeams[groupId][2] // 3rd place (index 2)
+        });
+      }
+    });
+    
+    // Sort third-place teams by points, then goal difference, then goals for
+    thirdPlaceTeams.sort((a, b) => {
+      if (b.team.stats.points !== a.team.stats.points) {
+        return b.team.stats.points - a.team.stats.points;
+      }
+      
+      const aGoalDiff = a.team.stats.goalsFor - a.team.stats.goalsAgainst;
+      const bGoalDiff = b.team.stats.goalsFor - b.team.stats.goalsAgainst;
+      if (bGoalDiff !== aGoalDiff) {
+        return bGoalDiff - aGoalDiff;
+      }
+      
+      return b.team.stats.goalsFor - a.team.stats.goalsFor;
+    });
+    
+    // Return the IDs of the best two third-place teams
+    return thirdPlaceTeams.slice(0, 2).map(item => item.team._id);
+  };
+
+  // Get the best two third-place teams
+  const bestThirdPlaceTeamIds = getThirdPlaceTeams();
+
   return (
     <div ref={printRef} className={`space-y-6 ${showPrintView ? 'print-view' : ''}`}>
       {/* Section Title and Print Button */}
@@ -496,7 +531,11 @@ export function Statistics() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {groupedTeams[groupId]?.map((team, index) => (
-                      <tr key={team._id} className={index < 2 ? "bg-green-50" : ""}>
+                      <tr key={team._id} className={
+                        index < 2 ? "bg-green-100" : 
+                        bestThirdPlaceTeamIds.includes(team._id) ? "bg-green-100" : 
+                        "bg-red-50"
+                      }>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {index + 1}
                         </td>
@@ -504,28 +543,28 @@ export function Statistics() {
                           {team.name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {team.stats.played}
+                          {team.stats?.played || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                          {team.stats.won}
+                          {team.stats?.won || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">
-                          {team.stats.drawn}
+                          {team.stats?.drawn || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                          {team.stats.lost}
+                          {team.stats?.lost || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {team.stats.goalsFor}
+                          {team.stats?.goalsFor || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {team.stats.goalsAgainst}
+                          {team.stats?.goalsAgainst || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {team.stats.goalsFor - team.stats.goalsAgainst}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {(team.stats?.goalsFor || 0) - (team.stats?.goalsAgainst || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                          {team.stats.points}
+                          {team.stats?.points || 0}
                         </td>
                       </tr>
                     ))}
@@ -560,68 +599,53 @@ export function Statistics() {
                     لعب
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    فاز
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    تعادل
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    خسر
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    له
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    عليه
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    +/-
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     نقاط
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {teams
-                  .sort((a, b) => (b.stats.points || 0) - (a.stats.points || 0))
-                  .map((team, index) => (
-                    <tr key={team._id} className={index < 3 ? "bg-green-50" : ""}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium">
-                        {team.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {getTeamGroup(team) === "بدون مجموعة" ? "بدون مجموعة" : `المجموعة ${getTeamGroup(team)}`}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {team.stats.played}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                        {team.stats.won}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">
-                        {team.stats.drawn}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                        {team.stats.lost}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {team.stats.goalsFor}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {team.stats.goalsAgainst}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {team.stats.goalsFor - team.stats.goalsAgainst}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                        {team.stats.points}
-                      </td>
-                    </tr>
-                  ))}
+                  .sort((a, b) => {
+                    if (b.stats?.points !== a.stats?.points) {
+                      return (b.stats?.points || 0) - (a.stats?.points || 0);
+                    }
+                    
+                    const aGoalDiff = (a.stats?.goalsFor || 0) - (a.stats?.goalsAgainst || 0);
+                    const bGoalDiff = (b.stats?.goalsFor || 0) - (b.stats?.goalsAgainst || 0);
+                    if (bGoalDiff !== aGoalDiff) {
+                      return bGoalDiff - aGoalDiff;
+                    }
+                    
+                    return (b.stats?.goalsFor || 0) - (a.stats?.goalsFor || 0);
+                  })
+                  .map((team, index) => {
+                    const groupId = getTeamGroup(team);
+                    const groupTeams = groupedTeams[groupId] || [];
+                    const positionInGroup = groupTeams.findIndex(t => t._id === team._id) + 1;
+                    
+                    const isQualified = positionInGroup <= 2 || bestThirdPlaceTeamIds.includes(team._id);
+                    
+                    return (
+                      <tr key={team._id} className={isQualified ? "bg-green-100" : "bg-red-50"}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">
+                          {team.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {groupId}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {team.stats?.played || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                          {team.stats?.points || 0}
+                        </td>
+                      </tr>
+                    )
+                  })
+                }
               </tbody>
             </table>
           </div>
