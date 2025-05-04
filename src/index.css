@@ -32,3 +32,38 @@ body {
 .link-text {
   @apply text-blue-500 hover:underline cursor-pointer font-medium;
 }
+
+.bracket-container {
+  background: transparent !important;
+  position: relative;
+  z-index: 10;
+}
+
+.bracket-container .decorative-background {
+  position: absolute;
+  z-index: 0;
+}
+
+/* Ensure colors are properly rendered in screenshots */
+.capturing-screenshot .bg-green-100 {
+  background-color: #dcfce7 !important;
+}
+
+.capturing-screenshot .bg-red-50 {
+  background-color: #fef2f2 !important;
+}
+
+/* Ensure colors are properly printed */
+@media print {
+  .bg-green-100 {
+    background-color: #dcfce7 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .bg-red-50 {
+    background-color: #fef2f2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
