@@ -57,6 +57,7 @@ interface KnockoutMatch {
     teamA: number;
     teamB: number;
   };
+  isEditing?: boolean;
 }
 
 // Type for casting when updating bracket match state
@@ -78,6 +79,7 @@ export function TournamentProgress() {
   const syncTeamStats = useMutation(api.tournament.syncTeamStats);
   const updateGroupName = useMutation(api.tournament.updateGroupName);
   const createMatch = useMutation(api.matches.create);
+  const updateMatch = useMutation(api.matches.update);
 
   const [editingSettings, setEditingSettings] = useState(false);
   const [newSettings, setNewSettings] = useState<Omit<TournamentSettings, "_id">>({
@@ -447,11 +449,62 @@ export function TournamentProgress() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const defaultDate = tomorrow.toISOString().split('T')[0];
     
+    if (match.matchId) {
+      const existingMatch = matches.find(m => m._id === match.matchId);
+      if (existingMatch) {
+        setEditingBracketMatch({
+          ...match,
+          matchDate: existingMatch.date,
+          matchTime: existingMatch.time,
+          score: existingMatch.score,
+          isEditing: true
+        } as KnockoutMatch);
+        return;
+      }
+    }
+    
     setEditingBracketMatch({
       ...match,
       matchDate: match.matchDate || defaultDate,
-      matchTime: match.matchTime || "18:00"
+      matchTime: match.matchTime || "18:00",
+      isEditing: false
     } as KnockoutMatch);
+  };
+
+  const handleSaveBracketMatch = async () => {
+    if (!editingBracketMatch) return;
+    
+    try {
+      if (!editingBracketMatch.teamA?.id || !editingBracketMatch.teamB?.id || 
+          !editingBracketMatch.matchDate || !editingBracketMatch.matchTime) {
+        alert("يجب اختيار فريقين للمباراة وتحديد التاريخ والوقت");
+        return;
+      }
+      
+      if (editingBracketMatch.isEditing && editingBracketMatch.matchId) {
+        await updateMatch({
+          matchId: editingBracketMatch.matchId,
+          date: editingBracketMatch.matchDate,
+          time: editingBracketMatch.matchTime,
+          teamA: editingBracketMatch.teamA.id,
+          teamB: editingBracketMatch.teamB.id,
+        });
+        
+        const updatedBracket = knockoutBracket.map(m => 
+          m.id === editingBracketMatch.id ? 
+            { ...editingBracketMatch, isEditing: undefined } : m
+        );
+        setKnockoutBracket(updatedBracket);
+        
+        setEditingBracketMatch(null);
+        return;
+      }
+      
+      return handleSaveBracketTeams();
+    } catch (error) {
+      console.error("Error updating match in bracket:", error);
+      alert("حدث خطأ أثناء تعديل/إنشاء المباراة");
+    }
   };
 
   const MatchBox = ({ 
@@ -1771,14 +1824,12 @@ export function TournamentProgress() {
               >
                 إلغاء
               </button>
-              {editingBracketMatch.round === 'round16' && !editingBracketMatch.matchId && (
-                <button
-                  onClick={handleSaveBracketTeams}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  حفظ
-                </button>
-              )}
+              <button
+                onClick={handleSaveBracketMatch}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                {editingBracketMatch.isEditing ? 'حفظ التغييرات' : 'إنشاء المباراة'}
+              </button>
             </div>
           </div>
         </div>
