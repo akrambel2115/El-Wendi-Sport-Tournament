@@ -561,4 +561,101 @@ export const updateGroupName = mutation({
     
     return { success: true, teamsUpdated: teams.length };
   },
-}); 
+});
+
+// Get teams ranked in their groups for knockout stage selection
+export const getGroupRankings = query({
+  args: {},
+  handler: async (ctx) => {
+    const teams = await ctx.db.query("teams").collect();
+    const groups = await ctx.db.query("groups").collect();
+
+    const groupRankings: { groupName: string, teams: any[] }[] = [];
+
+    // Process each group
+    for (const group of groups) {
+      const groupTeams = teams
+        .filter((team) => {
+          // Match either by group.teams array or by team.groupId
+          return team.groupId === group.name || 
+                 group.teams.includes(team._id);
+        })
+        .sort((a, b) => {
+          // First sort by points
+          if ((b.stats?.points || 0) !== (a.stats?.points || 0)) {
+            return (b.stats?.points || 0) - (a.stats?.points || 0);
+          }
+          
+          // Then by goal difference
+          const aGoalDiff = (a.stats?.goalsFor || 0) - (a.stats?.goalsAgainst || 0);
+          const bGoalDiff = (b.stats?.goalsFor || 0) - (b.stats?.goalsAgainst || 0);
+          
+          if (bGoalDiff !== aGoalDiff) {
+            return bGoalDiff - aGoalDiff;
+          }
+          
+          // Then by goals scored
+          return (b.stats?.goalsFor || 0) - (a.stats?.goalsFor || 0);
+        });
+
+      groupRankings.push({
+        groupName: group.name,
+        teams: groupTeams.map((team, index) => ({
+          ...team,
+          rank: index + 1
+        }))
+      });
+    }
+
+    return groupRankings;
+  }
+});
+
+// Get qualified teams for knockout stage
+export const getQualifiedTeams = query({
+  args: {
+    stage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all completed matches for this stage
+    const matches = await ctx.db
+      .query("matches")
+      .filter((q) => q.eq(q.field("stage"), args.stage))
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+
+    // Get all teams
+    const teams = await ctx.db.query("teams").collect();
+
+    // Create a map of winners
+    const winners: { teamId: Id<"teams">, teamName: string, matchId: Id<"matches"> }[] = [];
+
+    for (const match of matches) {
+      if (!match.score) continue;
+
+      let winnerId: Id<"teams"> | undefined;
+      
+      // Determine winner
+      if (match.score.teamA > match.score.teamB) {
+        winnerId = match.teamAId;
+      } else if (match.score.teamA < match.score.teamB) {
+        winnerId = match.teamBId;
+      } else {
+        // In case of a tie, choose team A as winner for simplicity
+        // This should be determined by tournament rules (penalties, etc.)
+        winnerId = match.teamAId;
+      }
+
+      const winnerTeam = teams.find(t => t._id === winnerId);
+      if (winnerTeam) {
+        winners.push({
+          teamId: winnerId,
+          teamName: winnerTeam.name,
+          matchId: match._id
+        });
+      }
+    }
+
+    return winners;
+  }
+});

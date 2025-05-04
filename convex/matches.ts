@@ -463,4 +463,140 @@ export const getUpcoming = query({
       return minutesA - minutesB;
     });
   },
-}); 
+});
+
+// Temporary function to replace a team in a match
+export const replaceTeamInMatch = mutation({
+  args: { 
+    matchId: v.id("matches"),
+    teamName: v.string(),
+    isTeamA: v.boolean()
+  },
+  handler: async (ctx, args) => {
+    console.log(`Replacing ${args.isTeamA ? 'TeamA' : 'TeamB'} in match ${args.matchId} with ${args.teamName}`);
+    
+    try {
+      // Find the team by name
+      const teams = await ctx.db
+        .query("teams")
+        .filter(q => q.eq(q.field("name"), args.teamName))
+        .collect();
+      
+      if (teams.length === 0) {
+        throw new Error(`Team "${args.teamName}" not found`);
+      }
+      
+      const teamId = teams[0]._id;
+      console.log(`Found team "${args.teamName}" with ID: ${teamId}`);
+      
+      // Update the match with the new team ID
+      const fieldToUpdate = args.isTeamA ? "teamAId" : "teamBId";
+      await ctx.db.patch(args.matchId, { [fieldToUpdate]: teamId });
+      
+      console.log(`Successfully replaced ${args.isTeamA ? 'TeamA' : 'TeamB'} in match ${args.matchId}`);
+      return { success: true, message: `Team ${args.isTeamA ? 'A' : 'B'} replaced successfully with "${args.teamName}"` };
+    } catch (error) {
+      console.error("Error replacing team in match:", error);
+      throw error;
+    }
+  },
+});
+
+// Temporary function to list all teams
+export const listTeamNames = query({
+  handler: async (ctx) => {
+    const teams = await ctx.db.query("teams").collect();
+    return teams.map(team => ({
+      id: team._id,
+      name: team.name
+    }));
+  },
+});
+
+// Get matches for a specific knockout round
+export const getKnockoutMatches = query({
+  args: {
+    stage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("matches")
+      .filter((q) => q.eq(q.field("stage"), args.stage))
+      .collect();
+  }
+});
+
+// Update match with result and record winner for tournament progression
+export const recordKnockoutResult = mutation({
+  args: {
+    matchId: v.id("matches"),
+    scoreA: v.number(),
+    scoreB: v.number(),
+    events: v.array(
+      v.object({
+        type: v.string(),
+        playerId: v.string(),
+        teamId: v.id("teams"),
+        minute: v.number(),
+      })
+    ),
+    manOfTheMatch: v.optional(v.string()),
+    nextRound: v.optional(v.string()),
+    nextMatchDate: v.optional(v.string()),
+    nextMatchTime: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Update the current match
+    await ctx.db.patch(args.matchId, {
+      score: {
+        teamA: args.scoreA,
+        teamB: args.scoreB,
+      },
+      events: args.events,
+      manOfTheMatch: args.manOfTheMatch,
+      status: "completed",
+    });
+
+    // Get the match
+    const match = await ctx.db.get(args.matchId);
+    if (!match) {
+      throw new Error("Match not found");
+    }
+
+    // Determine winner
+    let winnerId: Id<"teams">;
+    if (args.scoreA > args.scoreB) {
+      winnerId = match.teamAId;
+    } else if (args.scoreA < args.scoreB) {
+      winnerId = match.teamBId;
+    } else {
+      // In case of a draw, we need tie-breaking rules
+      // For now, let's just pick teamA as winner (this should be based on penalties etc.)
+      winnerId = match.teamAId;
+    }
+
+    // If we have info for the next round's match, create it
+    if (args.nextRound && args.nextMatchDate && args.nextMatchTime) {
+      // Get winner's team info
+      const winner = await ctx.db.get(winnerId);
+      if (!winner) {
+        throw new Error("Winner team not found");
+      }
+
+      // TODO: Create next round match - we would need the opposing team
+      // This is complex logic that depends on bracket structure
+      // For now, this would be handled by the client in our knock-out bracket component
+    }
+
+    // Update team stats (should call the shared stats update function)
+    try {
+      await ctx.db.query("tournament").first();
+      // await ctx.db.mutation.tournament.syncTeamStats({});
+      // Note: We need to call this through a different mechanism due to how Convex works
+    } catch (error) {
+      console.error("Failed to sync team stats after knockout match:", error);
+    }
+
+    return { success: true };
+  }
+});
