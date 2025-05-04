@@ -21,7 +21,7 @@ export function PublicInterface() {
   const [syncingStats, setSyncingStats] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   // State for screenshot modal
-  const [screenshotGroup, setScreenshotGroup] = useState<string | null>(null);
+  const [screenshotGroup, setScreenshotGroup] = useState<string | null | "allTeams">(null);
   const [showScreenshotModal, setShowScreenshotModal] = useState(false);
   // Add new states to track orientation
   const [originalOrientation, setOriginalOrientation] = useState<string | null>(null);
@@ -203,8 +203,8 @@ export function PublicInterface() {
     setSelectedMatchId(matchId);
   };
   
-  // Function to handle screenshot button click
-  const handleScreenshotClick = (groupId: string) => {
+  // Function to handle screenshot button click - modify to handle allTeams mode
+  const handleScreenshotClick = (groupId: string | "allTeams") => {
     // Save current orientation before changing it
     if (window.screen && 'orientation' in window.screen) {
       setOriginalOrientation((window.screen.orientation as any).type);
@@ -635,6 +635,14 @@ export function PublicInterface() {
                     ) : (
                       // Display all teams in a single table with a preview of top teams
                       <div>
+                        <div className="flex justify-end mb-4">
+                          <button
+                            onClick={() => handleScreenshotClick("allTeams")}
+                            className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+                          >
+                            لقطة شاشة للفرق المتأهلة
+                          </button>
+                        </div>
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
@@ -752,154 +760,6 @@ export function PublicInterface() {
                   </div>
                 ) : (
                   <p className="text-gray-500 text-center py-4">لا توجد بيانات للفرق حالياً</p>
-                )}
-              </div>
-            </div>
-
-            {/* Top Scorers Section */}
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden lg:col-span-2">
-              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-4 text-white">
-                <h2 className="text-2xl font-bold">الهدافون</h2>
-              </div>
-              <div className="p-6">
-                {matches.length > 0 ? (
-                  <div>
-                    {/* Calculate top scorers */}
-                    {(() => {
-                      // Group matches by player and team to avoid counting duplicate events
-                      const playerMatchGoals: { [key: string]: Set<string> } = {}; // key: playerId-teamId, value: Set of matchIds
-                      
-                      // Collect all goals from match events with deduplication
-                      const playerGoals: { [key: string]: { name: string; goals: number; teamName: string; matchIds: Set<string> } } = {};
-                      
-                      matches.forEach(match => {
-                        if (match.status === "completed" && match.events) {
-                          const goalEvents = match.events.filter(event => event.type === "goal");
-                          
-                          // Group goal events by player-team in this match
-                          const matchPlayerGoals: { [key: string]: { playerId: string, teamId: string, count: number } } = {};
-                          
-                          goalEvents.forEach(event => {
-                            // Normalize player name by converting to lowercase
-                            const normalizedName = event.playerId.toLowerCase().trim();
-                            const key = `${normalizedName}-${event.teamId}`;
-                            
-                            if (!matchPlayerGoals[key]) {
-                              matchPlayerGoals[key] = { 
-                                playerId: event.playerId, 
-                                teamId: event.teamId, 
-                                count: 0 
-                              };
-                            }
-                            matchPlayerGoals[key].count++;
-                          });
-                          
-                          // Add goals to global counter
-                          Object.entries(matchPlayerGoals).forEach(([key, data]) => {
-                            const { playerId, teamId, count } = data;
-                            const team = teams.find(t => t._id === teamId);
-                            
-                            // Use normalized name as key
-                            const normalizedName = playerId.toLowerCase().trim();
-                            
-                            if (!playerGoals[normalizedName]) {
-                              playerGoals[normalizedName] = {
-                                name: playerId, // Keep original case for display
-                                goals: 0,
-                                teamName: team?.name || "غير معروف",
-                                matchIds: new Set()
-                              };
-                            }
-                            
-                            playerGoals[normalizedName].goals += count;
-                            playerGoals[normalizedName].matchIds.add(match._id);
-                          });
-                        }
-                      });
-                      
-                      // Convert to array and sort by goals
-                      const topScorers = Object.values(playerGoals)
-                        .sort((a, b) => b.goals - a.goals)
-                        .slice(0, 5);
-                      
-                      if (topScorers.length > 0) {
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2">
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        #
-                                      </th>
-                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        اللاعب
-                                      </th>
-                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        الفريق
-                                      </th>
-                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        الأهداف
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {topScorers.map((player, index) => (
-                                      <tr key={index} className={index === 0 ? "bg-yellow-50" : ""}>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                          {index + 1}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                          {player.name}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                          {player.teamName}
-                                        </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
-                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                                            <span className="mr-1">⚽</span> {player.goals}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                            
-                            {/* Top Scorer Trophy Card */}
-                            {topScorers.length > 0 && (
-                              <div className="flex flex-col items-center justify-center bg-yellow-50 p-4 rounded-lg">
-                                <div className="text-4xl mb-2">🏆</div>
-                                <div className="text-xl font-bold text-center">{topScorers[0].name}</div>
-                                <div className="text-sm text-gray-600 mb-2">{topScorers[0].teamName}</div>
-                                <div className="flex items-center justify-center text-2xl font-bold text-yellow-600">
-                                  <span className="mr-2">⚽</span> {topScorers[0].goals}
-                                </div>
-                                <div className="mt-2 text-xs text-center text-gray-500">الهداف الحالي</div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <p className="text-gray-500 text-center py-4">لا توجد أهداف مسجلة حتى الآن</p>
-                        );
-                      }
-                    })()}
-                    
-                    <div className="text-center mt-4">
-                      <button
-                        onClick={() => setActiveTab("stats")}
-                        className="text-yellow-600 font-medium hover:text-yellow-800"
-                      >
-                        عرض كل الهدافين
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center py-4">لا توجد بيانات للمباريات حالياً</p>
                 )}
               </div>
             </div>
@@ -1187,6 +1047,14 @@ export function PublicInterface() {
                   ) : (
                     // Display all teams in a single table
                     <div className="overflow-x-auto">
+                      <div className="flex justify-end mb-4">
+                        <button
+                          onClick={() => handleScreenshotClick("allTeams")}
+                          className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          لقطة شاشة للفرق المتأهلة
+                        </button>
+                      </div>
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
@@ -1728,7 +1596,9 @@ export function PublicInterface() {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg overflow-hidden w-[90%] max-w-3xl">
             <div className="p-4 bg-blue-500 text-white flex justify-between">
-              <h3 className="text-xl font-bold">المجموعة {screenshotGroup}</h3>
+              <h3 className="text-xl font-bold">
+                {screenshotGroup === "allTeams" ? "الفرق المتأهلة" : `المجموعة ${screenshotGroup}`}
+              </h3>
               <button onClick={handleCloseScreenshotModal} className="text-white hover:text-gray-200">
                 <span className="text-2xl">×</span>
               </button>
@@ -1736,54 +1606,119 @@ export function PublicInterface() {
             
             <div className="p-6" id="screenshot-area">
               <div className="mb-4 text-center">
-                <h2 className="text-2xl font-bold">الوندي سبور - ترتيب المجموعة {screenshotGroup}</h2>
+                <h2 className="text-2xl font-bold">
+                  {screenshotGroup === "allTeams" 
+                    ? "الوندي سبور - الفرق المتأهلة للبطولة" 
+                    : `الوندي سبور - ترتيب المجموعة ${screenshotGroup}`}
+                </h2>
                 <p className="text-gray-600">إحياء ذكرى المرحوم بشاشحية أحسن</p>
               </div>
               
-              <table className="w-full border-collapse border border-gray-300 mb-6">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="border border-gray-300 px-4 py-2 text-center">#</th>
-                    <th className="border border-gray-300 px-4 py-2 text-right">الفريق</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">لعب</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">فاز</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">تعادل</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">خسر</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">له</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">عليه</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">+/-</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">نقاط</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedTeams[screenshotGroup]?.map((team, index) => (
-                    <tr key={team._id} 
-                        className={
-                          index < 2 ? "bg-green-100" : 
-                          bestThirdPlaceTeamIds.includes(team._id) ? "bg-green-100" : 
-                          "bg-red-50"
-                        }>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{index + 1}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-right font-medium">{team.name}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.played || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center font-medium text-green-700">{team.stats?.won || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center text-yellow-600">{team.stats?.drawn || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center text-red-600">{team.stats?.lost || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.goalsFor || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.goalsAgainst || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">
-                        {(team.stats?.goalsFor || 0) - (team.stats?.goalsAgainst || 0)}
-                      </td>
-                      <td className="border border-gray-300 px-4 py-2 text-center font-bold">{team.stats?.points || 0}</td>
+              {screenshotGroup === "allTeams" ? (
+                <table className="w-full border-collapse border border-gray-300 mb-6">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="border border-gray-300 px-4 py-2 text-center">#</th>
+                      <th className="border border-gray-300 px-4 py-2 text-right">الفريق</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">المجموعة</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">لعب</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">فاز</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">تعادل</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">خسر</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">نقاط</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {teams
+                      .sort((a, b) => {
+                        // Sort by points
+                        if ((b.stats?.points || 0) !== (a.stats?.points || 0)) {
+                          return (b.stats?.points || 0) - (a.stats?.points || 0);
+                        }
+                        
+                        // If points are equal, sort by goal difference
+                        const aGoalDiff = (a.stats?.goalsFor || 0) - (a.stats?.goalsAgainst || 0);
+                        const bGoalDiff = (b.stats?.goalsFor || 0) - (b.stats?.goalsAgainst || 0);
+                        if (bGoalDiff !== aGoalDiff) {
+                          return bGoalDiff - aGoalDiff;
+                        }
+                        
+                        // If goal difference is equal, sort by goals scored
+                        return (b.stats?.goalsFor || 0) - (a.stats?.goalsFor || 0);
+                      })
+                      .slice(0, 16) // Only show top 16 teams
+                      .map((team, index) => {
+                        const groupId = getTeamGroup(team);
+                        const groupTeams = groupedTeams[groupId] || [];
+                        const positionInGroup = groupTeams.findIndex(t => t._id === team._id) + 1;
+                        
+                        const isQualified = positionInGroup <= 2 || bestThirdPlaceTeamIds.includes(team._id);
+                        
+                        return (
+                          <tr key={team._id} className={isQualified ? "bg-green-100" : "bg-red-50"}>
+                            <td className="border border-gray-300 px-4 py-2 text-center">{index + 1}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-right font-medium">{team.name}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center">{getTeamGroup(team)}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.played || 0}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center font-medium text-green-700">{team.stats?.won || 0}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center text-yellow-600">{team.stats?.drawn || 0}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center text-red-600">{team.stats?.lost || 0}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-center font-bold">{team.stats?.points || 0}</td>
+                          </tr>
+                        );
+                      })
+                    }
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full border-collapse border border-gray-300 mb-6">
+                  {/* Existing group table structure */}
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="border border-gray-300 px-4 py-2 text-center">#</th>
+                      <th className="border border-gray-300 px-4 py-2 text-right">الفريق</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">لعب</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">فاز</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">تعادل</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">خسر</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">له</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">عليه</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">+/-</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">نقاط</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupedTeams[screenshotGroup]?.map((team, index) => (
+                      // Existing code for rendering group teams
+                      <tr key={team._id} 
+                          className={
+                            index < 2 ? "bg-green-100" : 
+                            bestThirdPlaceTeamIds.includes(team._id) ? "bg-green-100" : 
+                            "bg-red-50"
+                          }>
+                        <td className="border border-gray-300 px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-right font-medium">{team.name}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.played || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center font-medium text-green-700">{team.stats?.won || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center text-yellow-600">{team.stats?.drawn || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center text-red-600">{team.stats?.lost || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.goalsFor || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center">{team.stats?.goalsAgainst || 0}</td>
+                        <td className="border border-gray-300 px-4 py-2 text-center">
+                          {(team.stats?.goalsFor || 0) - (team.stats?.goalsAgainst || 0)}
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2 text-center font-bold">{team.stats?.points || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
               
               <div className="flex justify-between text-gray-500 text-sm">
                 <span>تاريخ: {new Date().toLocaleDateString('ar-DZ')}</span>
               </div>
             </div>
+            
           </div>
         </div>
       )}
